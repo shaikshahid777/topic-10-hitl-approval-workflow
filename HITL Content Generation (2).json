@@ -1,0 +1,357 @@
+{
+  "name": "HITL Content Generation",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "f9a3cbd8-9510-403c-b882-908ae3f17f78",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "request_id",
+              "name": "request_id",
+              "type": "string",
+              "value": "REQ-001"
+            },
+            {
+              "id": "request_type",
+              "name": "request_type",
+              "type": "string",
+              "value": "Marketing Content"
+            },
+            {
+              "id": "topic",
+              "name": "topic",
+              "type": "string",
+              "value": "New AI Automation Service"
+            },
+            {
+              "id": "user_request",
+              "name": "user_request",
+              "type": "string",
+              "value": "Create a professional announcement for our new AI automation service."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "03e738fb-af3e-45ea-8e8f-ec1e911da53d",
+      "name": "1. Set Content Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Request Type: {{ $json.request_type }}\nTopic: {{ $json.topic }}\nInstruction: {{ $json.user_request }}",
+        "options": {
+          "systemMessage": "You are a professional marketing content writer operating inside a human-in-the-loop approval pipeline.\n\nRules:\n- Write polished, ready-to-publish content for the given request type, topic, and instruction.\n- Keep the content to a maximum of 350 words.\n- Use a professional, safe, brand-appropriate tone. Do not include hate speech, defamation, medical/legal/financial guarantees, unverifiable claims, personal data, or anything that could create liability.\n- Do not invent statistics, prices, testimonials, or partnerships that were not provided.\n- If the request is unsafe or non-compliant, produce a neutral, compliant version instead.\n- Return ONLY the final content itself — no preamble, no explanations, no markdown headers, no notes."
+        }
+      },
+      "id": "39ce044a-45d3-4ea0-893f-99343f71de58",
+      "name": "2. AI Writes Draft",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxOutputTokens": 400
+        }
+      },
+      "id": "d7ba71c2-117f-4a19-a906-dfa7e1d4e402",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        528,
+        336
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "GyUgk15GB3craAwS",
+          "name": "Google Gemini API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "sendAndWait",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BSU9BPS0H",
+          "mode": "list",
+          "cachedResultName": "new-channel"
+        },
+        "message": "=*Please review this draft* (Request {{ $('1. Set Content Request').item.json.request_id }})\n\nTopic: {{ $('1. Set Content Request').item.json.topic }}\n\n------------------------------------\n{{ $json.output.length > 2800 ? $json.output.slice(0, 2800) + '\\\\n\\\\n…(truncated for preview — full text will be published)' : $json.output }}\n------------------------------------\n\nClick *Approve & Publish* or *Reject* below. You can add a comment. This workflow stays paused until you choose.",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {}
+      },
+      "id": "e0ec7a4b-e139-451d-9564-ef2e2cfa09b8",
+      "name": "3. Ask Human to Approve",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        800,
+        112
+      ],
+      "webhookId": "51815e50-16e3-4b68-8f42-527e5858193b",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "2SPIU6VesetVMoEN",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "approved",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "abc29841-2d9e-458a-b65b-3b7809be2033",
+      "name": "4. Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BSU9BPS0H",
+          "mode": "list",
+          "cachedResultName": "new-channel"
+        },
+        "text": "=AI CONTENT APPROVED / PUBLISHED — Request {{ $('1. Set Content Request').item.json.request_id }}\n\nReviewer comment: {{ $json.data.text || 'None' }}\n\n------------------------------------\n{{ $('2. AI Writes Draft').item.json.output }}",
+        "otherOptions": {}
+      },
+      "id": "39033ede-fab2-43f4-b777-98134f5c330c",
+      "name": "5. Publish Approved Content",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1248,
+        112
+      ],
+      "webhookId": "5e6c2340-3f87-496f-9400-081662d430ef",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "2SPIU6VesetVMoEN",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rej_req",
+              "name": "request_id",
+              "type": "string",
+              "value": "={{ $('1. Set Content Request').item.json.request_id }}"
+            },
+            {
+              "id": "rej_status",
+              "name": "rejection_status",
+              "type": "string",
+              "value": "REJECTED"
+            },
+            {
+              "id": "rej_comments",
+              "name": "reviewer_comments",
+              "type": "string",
+              "value": "={{ $json.data.text || 'None' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b5555555-5555-4555-8555-555555555555",
+      "name": "6. Prepare Rejection",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1248,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BSU9BPS0H",
+          "mode": "list",
+          "cachedResultName": "new-channel"
+        },
+        "text": "=AI CONTENT REJECTED — Request {{ $json.request_id }}\n\nStatus: {{ $json.rejection_status }}\nReviewer comment: {{ $json.reviewer_comments }}\n\nThis draft was rejected and will NOT be published.",
+        "otherOptions": {}
+      },
+      "id": "c6666666-6666-4666-8666-666666666666",
+      "name": "7. Send Rejection Notice",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1248,
+        304
+      ],
+      "webhookId": "820cc0b3-61fa-4a41-bf98-5801fac5b91a",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "2SPIU6VesetVMoEN",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "1. Set Content Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Set Content Request": {
+      "main": [
+        [
+          {
+            "node": "2. AI Writes Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. AI Writes Draft": {
+      "main": [
+        [
+          {
+            "node": "3. Ask Human to Approve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "2. AI Writes Draft",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Ask Human to Approve": {
+      "main": [
+        [
+          {
+            "node": "4. Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Approved?": {
+      "main": [
+        [
+          {
+            "node": "5. Publish Approved Content",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6. Prepare Rejection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Prepare Rejection": {
+      "main": [
+        [
+          {
+            "node": "7. Send Rejection Notice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "errorWorkflow": "Tvioh1CMw4wF2ZQE"
+  },
+  "versionId": "d67047df-d7b1-4918-9b68-f681cbe8279e",
+  "meta": {
+    "instanceId": "6abe9931809978352319cb21622ffdff38accce530bfc6c488633e9f18461d78"
+  },
+  "nodeGroups": [],
+  "id": "PsEAxtXkGe7suKws",
+  "tags": []
+}

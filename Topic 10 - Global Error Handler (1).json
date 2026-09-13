@@ -1,0 +1,123 @@
+{
+  "name": "Topic 10 - Global Error Handler",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1111111-1111-4111-8111-111111111111",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "wf_name",
+              "name": "workflow_name",
+              "type": "string",
+              "value": "={{ $json.workflow?.name || 'Unknown workflow' }}"
+            },
+            {
+              "id": "exec_id",
+              "name": "execution_id",
+              "type": "string",
+              "value": "={{ $json.execution?.id || 'N/A' }}"
+            },
+            {
+              "id": "err_msg",
+              "name": "error_message",
+              "type": "string",
+              "value": "={{ $json.execution?.error?.message || $json.execution?.error?.description || 'No error message available' }}"
+            },
+            {
+              "id": "ts",
+              "name": "timestamp",
+              "type": "string",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a2222222-2222-4222-8222-222222222222",
+      "name": "Format Error Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BSU9BPS0H",
+          "mode": "list",
+          "cachedResultName": "new-channel"
+        },
+        "text": "=:rotating_light: *WORKFLOW ERROR*\n\n*Workflow:* {{ $json.workflow_name }}\n*Execution ID:* {{ $json.execution_id }}\n*Error:* {{ $json.error_message }}\n*Timestamp:* {{ $json.timestamp }}",
+        "otherOptions": {}
+      },
+      "id": "a3333333-3333-4333-8333-333333333333",
+      "name": "Slack Error Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        0
+      ],
+      "webhookId": "7c0d3c62-ff22-4009-9944-f5ba2b73c426",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "2SPIU6VesetVMoEN",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error Details": {
+      "main": [
+        [
+          {
+            "node": "Slack Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "da904c80-07ba-4d0f-8af6-a87991162a88",
+  "meta": {
+    "instanceId": "6abe9931809978352319cb21622ffdff38accce530bfc6c488633e9f18461d78"
+  },
+  "nodeGroups": [],
+  "id": "Tvioh1CMw4wF2ZQE",
+  "tags": []
+}
